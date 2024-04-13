@@ -39,7 +39,7 @@ class Game:
 
         self.tilemap = Tilemap(self)
 
-        self.player = [Player(self, (50, 50), (8, 15)), Player(self, (50, 50), (8, 15))]
+        self.player = [Player(self, 0, (50, 50), (8, 15)), Player(self, 0, (50, 50), (8, 15))]
 
         self.load_level('map')
 
