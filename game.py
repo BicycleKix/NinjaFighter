@@ -7,7 +7,7 @@ import pygame
 
 from scripts.utils import load_image, load_images, load_player, Animation
 from scripts.tilemap import Tilemap
-from scripts.entities import Player
+from scripts.player import Player
 
 class Game:
     def __init__(self):
@@ -34,28 +34,16 @@ class Game:
 
         self.player_size = (8, 15)
 
-        self.movement1 = [False, False, False]
-        self.movement2 = [False, False, True]
+        self.movement1 = [False, False]
+        self.movement2 = [False, False]
+
+        self.flip = [False, True]
 
         self.tilemap = Tilemap(self)
 
-        self.player = [Player(self, 0, (50, 50), (8, 15)), Player(self, 0, (50, 50), (8, 15))]
-
-        self.load_level('map')
-
-    def load_level(self, map_id):
-        self.tilemap.load('data/maps/' + str(map_id) + '.json')
-
-        spawn_points = self.tilemap.extract([('spawners', 0)]).copy()
-
-        for player in self.player:
-            player.pos = random.choice(spawn_points)
-            player.air_time = 0
-            spawn_points.remove(player.pos)           
-
     def start(self):
 
-        choice = [0, 0]
+        self.choice = [0, 0]
         confirm = [False, False]
 
         while True:
@@ -72,33 +60,75 @@ class Game:
                         pygame.quit()
                         sys.exit()
                     if event.key == pygame.K_a:
-                        choice[0] = (choice[0] + 1) % self.character_count
+                        self.choice[0] = (self.choice[0] + 1) % self.character_count
                     if event.key == pygame.K_d:
-                        choice[0] = (choice[0] - 1) % self.character_count
+                        self.choice[0] = (self.choice[0] - 1) % self.character_count
                     if event.key == pygame.K_w:
                         confirm[0] = not confirm[0]
                     if event.key == pygame.K_LEFT:
-                        choice[1] = (choice[1] + 1) % self.character_count
+                        self.choice[1] = (self.choice[1] + 1) % self.character_count
                     if event.key == pygame.K_RIGHT:
-                        choice[1] = (choice[1] - 1) % self.character_count
+                        self.choice[1] = (self.choice[1] - 1) % self.character_count
                     if event.key == pygame.K_UP:
                         confirm[1] = not confirm[1]
 
-            self.display.blit(pygame.transform.scale(self.assets['players'][choice[0]], (160, 160)), (0, 40))
-            self.display.blit(pygame.transform.flip(pygame.transform.scale(self.assets['players'][choice[1]], (160, 160)), True, False), (150, 40))
+            self.display.blit(pygame.transform.scale(self.assets['players'][self.choice[0]], (160, 160)), (0, 40))
+            self.display.blit(pygame.transform.flip(pygame.transform.scale(self.assets['players'][self.choice[1]], (160, 160)), True, False), (150, 40))
 
             self.screen.blit(pygame.transform.scale(self.display, self.screen.get_size()), (0,0))
             pygame.display.update()
             self.clock.tick(60)
 
+    def load_level(self, map_id):
+        self.tilemap.load('data/maps/' + str(map_id) + '.json')
+
+        self.player_assets = {
+            'player1': {
+                'idle': Animation(load_images('players/red/idle', alt=True), img_dur=30),
+                'run': Animation(load_images('players/red/run', alt=True), img_dur=4),
+                'jump': Animation(load_images('players/red/jump', alt=True)),
+                'attack': Animation(load_images('players/red/attack', alt=True), img_dur=4, loop=False),
+                'slide': Animation(load_images('players/red/slide', alt=True)),
+                'dash': Animation(load_images('players/red/dash', alt=True)),
+            },
+            'player2': {
+                'idle': Animation(load_images('players/yellow/idle', alt=True), img_dur=30),
+                'run': Animation(load_images('players/yellow/run', alt=True), img_dur=4),
+                'jump': Animation(load_images('players/yellow/jump', alt=True)),
+                'attack': Animation(load_images('players/yellow/attack', alt=True), img_dur=4, loop=False),
+                'slide': Animation(load_images('players/yellow/slide', alt=True)),
+                'dash': Animation(load_images('players/yellow/dash', alt=True)),
+            },
+        }
+
+        self.player1 = Player(self, (50, 50), (6, 15), self.choice[0])
+        self.player2 = Player(self, (50, 50), (6, 15), self.choice[1])
+
+        spawn_points = self.tilemap.extract([('spawners', 0)])
+
+        spawn = random.choice(spawn_points)
+        self.player1.pos = spawn['pos']
+        self.player1.air_time = 0
+        spawn_points.remove(spawn)
+        spawn = random.choice(spawn_points)
+        self.player2.pos = spawn['pos']
+        self.player2.air_time = 0
+        spawn_points.remove(spawn)
 
     def run(self):
         run = True
+
+        self.load_level('map')
 
         while run:
             self.display.blit(self.assets['background'], (0,0))
 
             self.tilemap.render(self.display)
+
+            self.player1.update(self.tilemap, (self.movement1[1]-self.movement1[0], 0))
+            self.player1.render(self.display)
+            self.player2.update(self.tilemap, (self.movement2[1]-self.movement2[0], 0))
+            self.player2.render(self.display)
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -108,6 +138,18 @@ class Game:
                     if event.key == pygame.K_ESCAPE:
                         pygame.quit()
                         sys.exit()
+                    if event.key == pygame.K_w:
+                        if self.player1.jump():
+                            pass
+                    if event.key == pygame.K_a:
+                        self.movement1[0] = True
+                    if event.key == pygame.K_d:
+                        self.movement1[1] = True
+                if event.type == pygame.KEYUP:
+                    if event.key == pygame.K_a:
+                        self.movement1[0] = False
+                    if event.key == pygame.K_d:
+                        self.movement1[1] = False
 
             self.screen.blit(pygame.transform.scale(self.display, self.screen.get_size()), (0,0))
             pygame.display.update()
