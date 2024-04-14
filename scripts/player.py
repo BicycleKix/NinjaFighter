@@ -1,6 +1,6 @@
 import pygame
 
-
+from scripts.particle import Particle
 class Player:
     def __init__(self, game, pos, size, char):
         self.game = game
@@ -21,19 +21,25 @@ class Player:
         self.air_time = 0
         self.jumps = 1
         self.dashing = 0
+        self.attacking = 0
 
     def rect(self):
         return pygame.Rect(self.pos[0], self.pos[1], self.size[0], self.size[1])
     
-    def set_action(self, action):
+    def set_action(self, action, alt=False):
         if action != self.action:
             self.action = action
-            self.animation = self.game.player_assets['player' + str(self.char + 1)][self.action].copy()
+            if alt:
+                self.animation = self.game.assets[self.action].copy()
+            else:
+                self.animation = self.game.player_assets['player' + str(self.char + 1)][self.action].copy()
 
     def update(self, tilemap, movement=(0, 0)):
         self.collisions = {'up': False, 'down': False, 'right': False, 'left': False}
 
         frame_movement = (movement[0] + self.velocity[0], movement[1] + self.velocity[1])
+
+        self.air_time += 1
 
         self.pos[0] += frame_movement[0]
         entity_rect = self.rect()
@@ -87,6 +93,9 @@ class Player:
         else:
             self.set_action('idle')
 
+        if self.attacking:
+            self.attacking = max(0, self.attacking - 1)
+
         if self.dashing > 0:
             self.dashing = max(0, self.dashing - 1)
         if self.dashing < 0:
@@ -117,3 +126,8 @@ class Player:
                 self.dashing = -60
             else:
                 self.dashing = 60
+
+    def attack(self):
+        if not self.attacking:
+            self.attacking = 30
+            self.game.swords.append(Particle(self.game, 'attack', self.game.player1.pos, self.game.player1.velocity))
