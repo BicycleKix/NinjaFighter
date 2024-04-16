@@ -5,10 +5,9 @@ import os
 
 import pygame
 
-from scripts.utils import load_image, load_images, load_player, Animation
+from scripts.utils import load_image, load_images, load_player, Animation, Blits
 from scripts.tilemap import Tilemap
 from scripts.player import Player
-from scripts.particle import Particle
 
 
 class Game:
@@ -129,8 +128,6 @@ class Game:
         self.player2.air_time = 0
         spawn_points.remove(spawn)
 
-        self.swords = []
-
     def run(self):
         run = True
 
@@ -169,6 +166,8 @@ class Game:
                         self.movement2[0] = True
                     if event.key == pygame.K_RIGHT:
                         self.movement2[1] = True
+                    if event.key == pygame.K_RCTRL:
+                        self.player2.attack()
 
                 if event.type == pygame.KEYUP:
                     if event.key == pygame.K_a:

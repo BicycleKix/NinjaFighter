@@ -22,3 +22,19 @@ class Particle:
     def render(self, surf, offset=(0,0)):
         img = self.animation.img()
         surf.blit(img, self.pos)
+
+class Sword:
+    def __init__(self, game, player):
+        self.game = game
+        self.player = player
+        self.animation = self.game.assets['attack']
+
+    def update(self):
+        kill = False
+        if self.animation.done:
+            kill = True
+
+        self.pos = self.player.pos
+        self.animation.update()
+        
+        return kill

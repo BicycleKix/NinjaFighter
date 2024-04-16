@@ -1,6 +1,5 @@
 import pygame
 
-from scripts.particle import Particle
 class Player:
     def __init__(self, game, pos, size, char):
         self.game = game
@@ -21,10 +20,11 @@ class Player:
         self.air_time = 0
         self.jumps = 1
         self.dashing = 0
-        self.attacking = 0
+        self.attacking = False
 
     def rect(self):
         return pygame.Rect(self.pos[0], self.pos[1], self.size[0], self.size[1])
+
     
     def set_action(self, action, alt=False):
         if action != self.action:
@@ -79,6 +79,8 @@ class Player:
 
         self.animation.update()
 
+        self.attacking = max(0, self.attacking - 1)
+
         if self.pos[1] > 240:
             pass
 
@@ -92,9 +94,6 @@ class Player:
             self.set_action('run')
         else:
             self.set_action('idle')
-
-        if self.attacking:
-            self.attacking = max(0, self.attacking - 1)
 
         if self.dashing > 0:
             self.dashing = max(0, self.dashing - 1)
@@ -113,6 +112,11 @@ class Player:
     def render(self, surf):
         surf.blit(pygame.transform.flip(self.animation.img(), self.flip, False), (self.pos[0] + self.anim_offset[0], self.pos[1] + self.anim_offset[1]))
 
+        if self.attacking:
+            if not self.attack_animation.done:
+                self.attack_animation.update()
+                surf.blit(pygame.transform.flip(self.attack_animation.img(), self.flip, False), (self.pos[0] + self.anim_offset[0], self.pos[1] + self.anim_offset[1]))
+
     def jump(self):
         if self.jumps:
             self.velocity[1] = -3.5
@@ -129,5 +133,5 @@ class Player:
 
     def attack(self):
         if not self.attacking:
-            self.attacking = 30
-            self.game.swords.append(Particle(self.game, 'attack', self.game.player1.pos, self.game.player1.velocity))
+            self.attacking = 90
+            self.attack_animation = self.game.assets['attack'].copy()

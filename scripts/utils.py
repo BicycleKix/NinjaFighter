@@ -49,3 +49,18 @@ class Animation:
     
     def img(self):
         return self.images[int(self.frame / self.img_duration)]
+    
+class Blits:
+    def __init__(self, game, pos, size=(16, 16), cooldown=60):
+        self.game = game
+        self.size = size
+        self.cooldown = cooldown
+        self.pos = pos
+
+        self.sillhouette = 0
+
+    def update(self):
+        self.sillhouette = min(self.size[1], self.sillhouette + int(self.size[1]/self.cooldown))
+
+    def render(self, surf):
+        pygame.draw.rect(surf, (0, 0, 0, 155), pygame.Rect(self.pos[0], self.pos[1], self.size[0], self.sillhouette))
