@@ -49,18 +49,16 @@ class Blit:
         self.regeneration_speed = self.size[1] / self.cooldown
         self.regenerating = False
 
-        self.surface = pygame.Surface((self.size[0], self.size[1]), pygame.SRCALPHA)  # Changed size to self.size
+        self.surface = pygame.Surface((self.size[0], self.size[1]), pygame.SRCALPHA)
 
     def regenerate(self):
         if not self.regenerating:
             self.regenerating = True
             self.sillhouette = self.size[1]
-            print('regen')
 
     def update(self):
         if self.regenerating:
             self.sillhouette = max(0, self.sillhouette - self.regeneration_speed)
-            print(self.sillhouette)
             if self.sillhouette == 0:
                 self.regenerating = False
 
