@@ -45,26 +45,29 @@ class Blit:
         self.cooldown = cooldown
         self.pos = pos
 
-        self.sillhouette = self.size[1]
-        self.regeneration_speed = int(self.size[1] / self.cooldown)
+        self.sillhouette = 0
+        self.regeneration_speed = self.size[1] / self.cooldown
         self.regenerating = False
 
-        self.surface = pygame.Surface((320, 240), pygame.SRCALPHA)
+        self.surface = pygame.Surface((self.size[0], self.size[1]), pygame.SRCALPHA)  # Changed size to self.size
 
     def regenerate(self):
         if not self.regenerating:
             self.regenerating = True
-            self.sillhouette = 0
+            self.sillhouette = self.size[1]
+            print('regen')
 
     def update(self):
         if self.regenerating:
-            self.sillhouette = min(self.size[1], self.sillhouette + self.regeneration_speed)
-            if self.sillhouette == self.size[1]:
+            self.sillhouette = max(0, self.sillhouette - self.regeneration_speed)
+            print(self.sillhouette)
+            if self.sillhouette == 0:
                 self.regenerating = False
 
     def render(self, surf):
-        pygame.draw.rect(self.surface, (0, 255, 0, 100), pygame.Rect(self.pos[0], self.pos[1], self.size[0], self.sillhouette))
-
+        self.surface.fill((0, 0, 0, 0))
+        pygame.draw.rect(self.surface, (0, 255, 0, 100), pygame.Rect(0, 0, self.size[0], int(self.sillhouette)))
         surf.blit(self.surface, self.pos)
+
 
 Game().run()
