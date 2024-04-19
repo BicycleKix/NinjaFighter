@@ -23,10 +23,11 @@ def load_images(path, alt=False):
             images.append(load_image(path + '/' + img_name))
     return images
 
-def load_player(player):
-    sprite = []
-    for folder in os.listdir(BASE_IMG_PATH + player):
-        sprite.append(load_images(player + '/' + folder))
+def draw_rect(surf, color, pos, size=(18, 18)):
+    pygame.draw.rect(surf, color, pygame.Rect(pos[0], pos[1], size[0], size[1]))
+
+def icon(surf, img, pos, size=(14, 14)):
+    surf.blit(pygame.transform.scale(img, size), pos)
 
 class Animation:
     def __init__(self, images, img_dur=5, loop=True):
@@ -50,7 +51,7 @@ class Animation:
     def img(self):
         return self.images[int(self.frame / self.img_duration)]
     
-class Blits:
+class Blit:
     def __init__(self, game, pos, size=(16, 16), cooldown=60):
         self.game = game
         self.size = size
@@ -58,9 +59,23 @@ class Blits:
         self.pos = pos
 
         self.sillhouette = 0
+        self.regeneration_speed = self.size[1] / self.cooldown
+        self.regenerating = False
+
+        self.surface = pygame.Surface((320, 240), pygame.SRCALPHA)
+
+    def regenerate(self):
+        if not self.regenerating:
+            self.regenerating = True
+            self.sillhouette = self.size[1]
 
     def update(self):
-        self.sillhouette = min(self.size[1], self.sillhouette + int(self.size[1]/self.cooldown))
+        if self.regenerating:
+            self.sillhouette = max(0, self.sillhouette - self.regeneration_speed)
+            if self.sillhouette == 0:
+                self.regenerating = False
 
     def render(self, surf):
-        pygame.draw.rect(surf, (0, 0, 0, 155), pygame.Rect(self.pos[0], self.pos[1], self.size[0], self.sillhouette))
+        self.surface.fill((0, 0, 0, 0))
+        pygame.draw.rect(self.surface, (255, 255, 255, 100), pygame.Rect(0, 0, self.size[0], int(self.sillhouette)))
+        surf.blit(self.surface, self.pos)

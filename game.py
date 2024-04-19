@@ -5,10 +5,9 @@ import os
 
 import pygame
 
-from scripts.utils import load_image, load_images, load_player, Animation, Blits
+from scripts.utils import load_image, load_images, draw_rect, icon, load_png, Animation, Blit
 from scripts.tilemap import Tilemap
 from scripts.player import Player
-
 
 class Game:
     def __init__(self):
@@ -35,10 +34,31 @@ class Game:
             'grass': load_images('tiles/grass'),
             'large_decor': load_images('tiles/large_decor'),
             'stone': load_images('tiles/stone'),
-            'background': pygame.transform.scale(load_image('background.png'),self.display.get_size()),
+            'background': pygame.transform.scale(load_image('background.png'), self.display.get_size()),
             'clouds': load_images('clouds'),
             'players': load_images('player_selection', alt=True),
             'attack': Animation(load_images('attack', alt=True), img_dur=3, loop=False),
+        }
+
+        self.blits = {
+            'p1_attack': Blit(self, (10, 10), cooldown=90),
+            'p2_attack': Blit(self, (294, 10), cooldown=90),
+            'p1_dash': Blit(self, (30, 10), cooldown=180),
+            'p2_dash': Blit(self, (274, 10), cooldown=180),
+        }
+
+        self.rects = {
+            'attack1': {'color': (170, 0, 0), 'pos': (9, 9)},
+            'attack2': {'color': (170, 0, 0), 'pos': (293, 9)},
+            'dash1': {'color': (0, 100, 220), 'pos':(29, 9)},
+            'dash2': {'color': (0, 100, 220), 'pos':(273, 9)},
+        }
+
+        self.icons = {
+            'sword1': {'img': load_png('icons/sword.png'), 'pos': (11, 11)},
+            'sword2': {'img': load_png('icons/sword.png'), 'pos': (295, 11)},
+            'dash1': {'img': load_png('icons/dash.png'), 'pos': (31, 11)},
+            'dash2': {'img': load_png('icons/dash.png'), 'pos': (275, 11)},
         }
 
         self.player_size = (8, 15)
@@ -71,6 +91,8 @@ class Game:
                     if event.key == pygame.K_ESCAPE:
                         pygame.quit()
                         sys.exit()
+                    if event.key == pygame.K_f:
+                        pygame.display.toggle_fullscreen()
                     if event.key == pygame.K_a and not confirm[0]:
                         self.choice[0] = (self.choice[0] + 1) % self.character_count
                     if event.key == pygame.K_d and not confirm[0]:
@@ -114,8 +136,9 @@ class Game:
             },
         }
 
-        self.player1 = Player(self, (50, 50), (6, 15), self.choice[0])
-        self.player2 = Player(self, (50, 50), (6, 15), self.choice[1])
+        print(self.choice)
+        self.player1 = Player(self, (50, 50), (8, 15), 1)
+        self.player2 = Player(self, (50, 50), (8, 15), 2)
 
         spawn_points = self.tilemap.extract([('spawners', 0)])
 
@@ -141,6 +164,22 @@ class Game:
             self.player2.update(self.tilemap, (self.movement2[1]-self.movement2[0], 0))
             self.player2.render(self.display)
 
+            for rect_data in self.rects.values():
+                if 'size' in rect_data:
+                    draw_rect(self.display, rect_data['color'], rect_data['pos'], rect_data['size'])
+                else:
+                    draw_rect(self.display, rect_data['color'], rect_data['pos'])
+
+            for icons in self.icons.values():
+                if 'size' in icons:
+                    icon(self.display, icons['img'], icons['pos'], icons['size'])
+                else:
+                    icon(self.display, icons['img'], icons['pos'])
+
+            for blits in self.blits.values():
+                blits.update()
+                blits.render(self.display)
+
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     pygame.quit()
@@ -149,6 +188,9 @@ class Game:
                     if event.key == pygame.K_ESCAPE:
                         pygame.quit()
                         sys.exit()
+                    if event.key == pygame.K_f:
+                        pygame.display.toggle_fullscreen()
+
                     if event.key == pygame.K_w:
                         if self.player1.jump():
                             pass
@@ -157,7 +199,11 @@ class Game:
                     if event.key == pygame.K_d:
                         self.movement1[1] = True
                     if event.key == pygame.K_e:
-                        self.player1.attack()
+                        if self.player1.attack():
+                            self.blits['p1_attack'].regenerate()
+                    if event.key == pygame.K_r:
+                        if self.player1.dash():
+                            self.blits['p1_dash'].regenerate()
 
                     if event.key == pygame.K_UP:
                         if self.player2.jump():
@@ -166,8 +212,12 @@ class Game:
                         self.movement2[0] = True
                     if event.key == pygame.K_RIGHT:
                         self.movement2[1] = True
-                    if event.key == pygame.K_RCTRL:
-                        self.player2.attack()
+                    if event.key in (pygame.K_RCTRL, pygame.K_l):
+                        if self.player2.attack():
+                            self.blits['p2_attack'].regenerate()
+                    if event.key == pygame.K_RSHIFT:
+                        if self.player2.dash():
+                            self.blits['p2_dash'].regenerate()
 
                 if event.type == pygame.KEYUP:
                     if event.key == pygame.K_a:
