@@ -7,8 +7,6 @@ class Player:
         self.size = size
         self.char = char
 
-        self.dead = False
-
         self.velocity = [0, 0]
         self.collisions = {'up': False, 'down': False, 'right': False, 'left': False}
 
@@ -23,11 +21,21 @@ class Player:
 
         self.air_time = 0
         self.jumps = 1
+
         self.dashing = 0
         self.attacking = False
 
-    def rect(self):
-        return pygame.Rect(self.pos[0], self.pos[1], self.size[0], self.size[1])
+        self.hitting = False
+        self.health = 100.
+
+    def rect(self, alt=False):
+        if alt:
+            if self.flip:
+                return pygame.Rect(self.pos[0] - 12, self.pos[1] -2, 12, 17)
+            else:
+                return pygame.Rect(self.pos[0] + 8, self.pos[1] -2, 12, 17)
+        else:
+            return pygame.Rect(self.pos[0], self.pos[1], self.size[0], self.size[1])
 
     
     def set_action(self, action, alt=False):
@@ -86,13 +94,13 @@ class Player:
         self.attacking = max(0, self.attacking - 1)
 
         if self.pos[1] > 240:
-            self.dead = True
+            self.health = 0
 
         if self.collisions['down']:
             self.air_time = 0
             self.jumps = 1
 
-        if abs(self.dashing) > 170:
+        if abs(self.dashing) > 110:
             self.set_action('dash')
         elif self.air_time > 4:
             self.set_action('jump')
@@ -105,9 +113,9 @@ class Player:
             self.dashing = max(0, self.dashing - 1)
         if self.dashing < 0:
             self.dashing = min(0, self.dashing + 1)
-        if abs(self.dashing) > 160:
+        if abs(self.dashing) > 100:
             self.velocity[0] = abs(self.dashing) / self.dashing * 5
-            if abs(self.dashing) == 161:
+            if abs(self.dashing) == 101:
                 self.velocity[0] *= 0.1
 
         if self.velocity[0] > 0:
@@ -136,13 +144,15 @@ class Player:
     def dash(self):
         if not self.dashing and self.attacking <= 51:
             if self.flip:
-                self.dashing = -180
+                self.dashing = -120
             else:
-                self.dashing = 180
+                self.dashing = 120
+            self.hitting = False
             return True
 
     def attack(self):
-        if not self.attacking and self.dashing <= 160:
+        if not self.attacking and self.dashing <= 100:
             self.attacking = 90
             self.attack_animation = self.game.assets['attack'].copy()
+            self.hitting = False
             return True
