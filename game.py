@@ -19,7 +19,6 @@ class Game:
         self.font3 = pygame.font.SysFont("comicsans", 13, bold=True)
         self.font4 = pygame.font.SysFont('monolisa', 32)
 
-
         self.green = (0, 155, 0)
         self.dark_green = (40, 70, 40)
 
@@ -28,6 +27,15 @@ class Game:
         self.display = pygame.Surface((320, 240))
 
         self.clock = pygame.time.Clock()
+
+        # joystick_count = pygame.joystick.get_count()
+        self.controllers = []
+
+        # for i in range(joystick_count):
+        #     joystick = pygame.joystick.Joystick(i)
+        #     joystick.init()
+        #     self.controllers.append(joystick)
+        #     print("Joystick", i + 1, ":", joystick.get_name())
 
         self.character_count = len(os.listdir('data/images/player_selection'))
 
@@ -90,10 +98,7 @@ class Game:
 
         self.player_size = (8, 15)
 
-        self.movement1 = [False, False]
-        self.movement2 = [False, False]
-
-        self.flip = [False, True]
+        self.movement = [[False, False], [False, False]]
 
         self.tilemap = Tilemap(self)
 
@@ -152,6 +157,7 @@ class Game:
         run = True
 
         while run:
+
             self.display.blit(self.assets['background'], (0,0))
 
             self.display.blit(title_font, ((320 - title_font.get_width())/2, 0))
@@ -168,6 +174,15 @@ class Game:
                 if event.type == pygame.QUIT:
                     self.quit()
 
+                if event.type == pygame.JOYDEVICEADDED:
+                    joystick = pygame.joystick.Joystick(event.device_index)
+                    joystick.init()
+                    self.controllers.append(joystick)
+                    print("Joystick", event.device_index + 1, ":", joystick.get_name())
+
+                if event.type == pygame.JOYDEVICEREMOVED:
+                    del self.controllers[event.instance_id]
+
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:
                         self.quit()
@@ -182,6 +197,21 @@ class Game:
                     if event.key == pygame.K_RETURN:
                         self.sfx['select'].play()
                         menu_options[selection]()
+
+                if event.type == pygame.JOYBUTTONDOWN:
+                    if event.button == 0:
+                        self.sfx['select'].play()
+                        menu_options[selection]()
+                    if event.button == 1:
+                        self.quit()
+
+                if event.type == pygame.JOYHATMOTION:
+                    direction = event.value
+
+                    menu_rects[selection][0] = self.green
+                    selection = (selection - direction[1]) % len(menu_rects)
+                    if direction[1] != 0:
+                        self.sfx['select'].play()
 
             self.screen.blit(pygame.transform.scale(self.display, self.screen.get_size()), (0,0))
             pygame.display.update()
@@ -232,7 +262,7 @@ class Game:
                 if event.type == pygame.KEYDOWN:
                     self.sfx['select'].play()
                     if event.key == pygame.K_ESCAPE:
-                        self.main_menu()
+                        return
                     if event.key in (pygame.K_s, pygame.K_DOWN):
                         menu_rects[selection][0] = self.green
                         selection = (selection + 1) % len(menu_rects)
@@ -241,6 +271,21 @@ class Game:
                         selection = (selection - 1) % len(menu_rects)
                     if event.key == pygame.K_RETURN:
                         menu_options[selection]()
+
+                if event.type == pygame.JOYBUTTONDOWN:
+                    if event.button == 0:
+                        self.sfx['select'].play()
+                        menu_options[selection]()
+                    if event.button == 1:
+                        return
+
+                if event.type == pygame.JOYHATMOTION:
+                    direction = event.value
+
+                    menu_rects[selection][0] = self.green
+                    selection = (selection - direction[1]) % len(menu_rects)
+                    if direction[1] != 0:
+                        self.sfx['select'].play()
 
             self.screen.blit(pygame.transform.scale(self.display, self.screen.get_size()), (0,0))
             pygame.display.update()
@@ -272,6 +317,15 @@ class Game:
                     elif len(text) < 16:
                         text += event.unicode
 
+                if event.type == pygame.JOYBUTTONDOWN:
+                    if event.button == 0:
+                        if text not in self.player_stats:
+                            self.player_stats[text] = ( {'gp': 0, 'w': 0, 'l': 0} )
+                            return
+                    if event.button == 1:
+                        #don't save
+                        return
+
             self.display.fill((30, 30, 30))
             pygame.draw.rect(self.display, color, text_rect, 2)
 
@@ -295,7 +349,7 @@ class Game:
         confirm = [False, False]
         player_confirm = [False, False]
 
-        self.players = list(self.player_stats.keys())
+        self.users = list(self.player_stats.keys())
 
         start = True
         
@@ -311,7 +365,7 @@ class Game:
             self.display.blit(pygame.transform.scale(self.assets['players'][self.choice[0]], (160, 160)), (0, 40))
             self.display.blit(pygame.transform.flip(pygame.transform.scale(self.assets['players'][self.choice[1]], (160, 160)), True, False), (150, 40))
 
-            player_text = [self.font3.render(str(self.players[self.player_choice[0]]), 0, 'white'), self.font3.render(str(self.players[self.player_choice[1]]), 0, 'white')]
+            player_text = [self.font3.render(str(self.users[self.player_choice[0]]), 0, 'white'), self.font3.render(str(self.users[self.player_choice[1]]), 0, 'white')]
             self.display.blit(player_text[0], ((self.assets['players'][0].get_width() * 5 - player_text[0].get_width()) / 2, 170))
             self.display.blit(player_text[1], (150 + (self.assets['players'][0].get_width() * 5 - player_text[1].get_width()) / 2, 170))
 
@@ -320,21 +374,20 @@ class Game:
                     self.quit()
                 if event.type == pygame.KEYDOWN:
                     self.sfx['select'].play()
-                    if event.key == pygame.K_RETURN and all(confirm):
-                        start = False
-                        break
+                    if event.key == pygame.K_RETURN and all(player_confirm):
+                        self.load_level('map')
                     if event.key == pygame.K_ESCAPE:
-                        self.main_menu()
+                        return
                     if event.key == pygame.K_a:
                         if not confirm[0]:
                             self.choice[0] = (self.choice[0] + 1) % self.character_count
                         elif not player_confirm[0]:
-                            self.player_choice[0] = (self.player_choice[0] + 1) % len(self.players)
+                            self.player_choice[0] = (self.player_choice[0] + 1) % len(self.users)
                     if event.key == pygame.K_d:
                         if not confirm[0]:
                             self.choice[0] = (self.choice[0] - 1) % self.character_count
                         elif not player_confirm[0]:
-                            self.player_choice[0] = (self.player_choice[0] - 1) % len(self.players)
+                            self.player_choice[0] = (self.player_choice[0] - 1) % len(self.users)
                     if event.key == pygame.K_w:
                         if not confirm[0]:
                             confirm[0] = True
@@ -349,12 +402,12 @@ class Game:
                         if not confirm[1]:
                             self.choice[1] = (self.choice[1] + 1) % self.character_count
                         elif not player_confirm[1]:
-                            self.player_choice[1] = (self.player_choice[1] + 1) % len(self.players)
+                            self.player_choice[1] = (self.player_choice[1] + 1) % len(self.users)
                     if event.key == pygame.K_RIGHT:
                         if not confirm[1]:
                             self.choice[1] = (self.choice[1] - 1) % self.character_count
                         elif not player_confirm[1]:
-                            self.player_choice[1] = (self.player_choice[1] - 1) % len(self.players)
+                            self.player_choice[1] = (self.player_choice[1] - 1) % len(self.users)
                     if event.key == pygame.K_UP:
                         if not confirm[1]:
                             confirm[1] = True
@@ -366,12 +419,39 @@ class Game:
                         else:
                             confirm[1] = False
 
+                for i, controller in enumerate(self.controllers):
+                    if event.type == pygame.JOYHATMOTION:
+                        if event.joy == controller.get_id():
+                            direction = event.value
+                            if any(value != 0 for value in direction):
+                                self.sfx['select'].play()
+
+                            if not confirm[i]:
+                                self.choice[i] = (self.choice[i] + direction[0]) % self.character_count
+                            elif not player_confirm[i]:
+                                self.player_choice[i] = (self.player_choice[i] + direction[0]) % len(self.users)
+
+                    if event.type == pygame.JOYBUTTONDOWN:
+                        if event.joy == controller.get_id():
+                            self.sfx['select'].play()
+                            if event.button == 0:
+                                if not confirm[i]:
+                                    confirm[i] = True
+                                else:
+                                    player_confirm[i] = True
+                            elif event.button == 1:
+                                if player_confirm[i]:
+                                    player_confirm[i] = False
+                                elif confirm[i]:
+                                    confirm[i] = False
+                                elif all(not confirmed for confirmed in confirm):
+                                    return
+                        if event.button == 0 and all(player_confirm):
+                            self.load_level('map')
+
             self.screen.blit(pygame.transform.scale(self.display, self.screen.get_size()), (0,0))
             pygame.display.update()
             self.clock.tick(60)
-
-        self.load_level('map')
-        self.game()
 
     def load_level(self, map_id):
         self.tilemap.load('data/maps/' + str(map_id) + '.json')
@@ -393,19 +473,22 @@ class Game:
             },
         }
 
-        self.player1 = Player(self, (50, 50), (8, 15), 1)
-        self.player2 = Player(self, (50, 50), (8, 15), 2)
+        self.players = [Player(self, (50, 50), (8, 15), 1), Player(self, (50, 50), (8, 15), 2)]
+
+        self.players[0] = Player(self, (50, 50), (8, 15), 1)
+        self.players[1] = Player(self, (50, 50), (8, 15), 2)
 
         spawn_points = self.tilemap.extract([('spawners', 0)])
 
         spawn = random.choice(spawn_points)
-        self.player1.pos = spawn['pos']
-        self.player1.air_time = 0
+        self.players[0].pos = spawn['pos']
+        self.players[0].air_time = 0
         spawn_points.remove(spawn)
         spawn = random.choice(spawn_points)
-        self.player2.pos = spawn['pos']
-        self.player2.air_time = 0
+        self.players[1].pos = spawn['pos']
+        self.players[1].air_time = 0
         spawn_points.remove(spawn)
+        self.game()
 
     def pause(self):
 
@@ -467,6 +550,21 @@ class Game:
                     if event.key == pygame.K_RETURN:
                         menu_options[selection]()
 
+                if event.type == pygame.JOYBUTTONDOWN:
+                    if event.button == 0:
+                        self.sfx['select'].play()
+                        menu_options[selection]()
+                    if event.button == 1:
+                        return
+
+                if event.type == pygame.JOYHATMOTION:
+                    direction = event.value
+
+                    menu_rects[selection][0] = self.green
+                    selection = (selection - direction[1]) % len(menu_rects)
+                    if direction[1] != 0:
+                        self.sfx['select'].play()
+
             self.screen.blit(pygame.transform.scale(self.display, self.screen.get_size()), (0,0))
             pygame.display.update()
             self.clock.tick(60)
@@ -480,10 +578,10 @@ class Game:
 
             self.tilemap.render(self.display)
 
-            self.player1.update(self.tilemap, (self.movement1[1]-self.movement1[0], 0))
-            self.player1.render(self.display)
-            self.player2.update(self.tilemap, (self.movement2[1]-self.movement2[0], 0))
-            self.player2.render(self.display)
+            self.players[0].update(self.tilemap, (self.movement[0][1]-self.movement[0][0], 0))
+            self.players[0].render(self.display)
+            self.players[1].update(self.tilemap, (self.movement[1][1]-self.movement[1][0], 0))
+            self.players[1].render(self.display)
 
             for rect_data in self.rects.values():
                 if 'size' in rect_data:
@@ -503,44 +601,33 @@ class Game:
 
             pygame.draw.rect(self.display, (255, 0, 0), (10, 30, 50, 10))
             pygame.draw.rect(self.display, (255, 0, 0), (260, 30, 50, 10))
-            pygame.draw.rect(self.display, (0, 255, 0), (10, 30, 50*(self.player1.health/100.), 10))
-            pygame.draw.rect(self.display, (0, 255, 0), (260, 30, 50*(self.player2.health/100.), 10))
+            pygame.draw.rect(self.display, (0, 255, 0), (10, 30, 50*(self.players[0].health/100.), 10))
+            pygame.draw.rect(self.display, (0, 255, 0), (260, 30, 50*(self.players[1].health/100.), 10))
 
-            if self.player1.attacking and not self.player1.hitting:
-                if self.player1.attack_animation.frame in {3, 4, 5, 7, 8, 9}:
-                    if self.player1.rect(alt=True).colliderect(self.player2.rect()):
-                        self.player2.health -= 10
-                        self.player1.hitting = True
-                        self.sfx['hit'].play()
+            for attacker in self.players:
+                for target in self.players:
+                    if target != attacker:
+                        if attacker.attacking and not attacker.hitting:
+                            if attacker.attack_animation.frame in {3, 4, 5, 7, 8, 9}:
+                                if pygame.Rect.colliderect(target.rect(), attacker.rect(alt=True)):
+                                    target.health -= 10
+                                    attacker.hitting = True
+                                    self.sfx['hit'].play()
+                        if abs(attacker.dashing) >= 100 and not attacker.hitting:
+                            if pygame.Rect.colliderect(target.rect(), attacker.rect()):
+                                target.health -= 20
+                                attacker.hitting = True
+                                self.sfx['hit'].play()
 
-            if self.player2.attacking and not self.player2.hitting:
-                if self.player2.attack_animation.frame in {3, 4, 5, 7, 8, 9}:
-                    if self.player2.rect(alt=True).colliderect(self.player1.rect()):
-                        self.player1.health -= 10
-                        self.player2.hitting = True
-                        self.sfx['hit'].play()
-
-            if self.player1.dashing >= 100 and not self.player1.hitting:
-                if self.player1.rect().colliderect(self.player2.rect()):
-                    self.player1.hitting = True
-                    self.player2.health -= 20
-                    self.sfx['hit'].play()
-
-            if self.player2.dashing >= 100 and not self.player2.hitting:
-                if self.player2.rect().colliderect(self.player1.rect()):
-                    self.player2.hitting = True
-                    self.player1.health -= 20
-                    self.sfx['hit'].play()
-
-            if self.player1.health <= 0 or self.player2.health <= 0:
+            if any(player.health <= 0 for player in self.players):
                 for players in self.player_stats:
                     self.player_stats[players]['gp'] += 1
-                if self.player1.health <= 0:
-                    self.player_stats[self.players[1]]['w'] += 1
-                    self.player_stats[self.players[0]]['l'] += 1
+                if self.players[0].health <= 0:
+                    self.player_stats[self.users[1]]['w'] += 1
+                    self.player_stats[self.users[0]]['l'] += 1
                 else:
-                    self.player_stats[self.players[1]]['l'] += 1
-                    self.player_stats[self.players[0]]['w'] += 1
+                    self.player_stats[self.users[1]]['l'] += 1
+                    self.player_stats[self.users[0]]['w'] += 1
                 self.load_level('map')
 
             for event in pygame.event.get():
@@ -552,47 +639,80 @@ class Game:
                         self.sfx['select'].play()
 
                     if event.key == pygame.K_w:
-                        if self.player1.jump():
+                        if self.players[0].jump():
                             self.sfx['jump'].play()
                     if event.key == pygame.K_a:
-                        self.movement1[0] = True
+                        self.movement[0][0] = True
                     if event.key == pygame.K_d:
-                        self.movement1[1] = True
+                        self.movement[0][1] = True
                     if event.key == pygame.K_e:
-                        if self.player1.attack():
+                        if self.players[0].attack():
                             self.blits['p1_attack'].regenerate()
                             self.sfx['dash'].play()
                     if event.key == pygame.K_r:
-                        if self.player1.dash():
+                        if self.players[0].dash():
                             self.blits['p1_dash'].regenerate()
                             self.sfx['dash'].play()
 
                     if event.key == pygame.K_UP:
-                        if self.player2.jump():
+                        if self.players[1].jump():
                             self.sfx['jump'].play()
                     if event.key == pygame.K_LEFT:
-                        self.movement2[0] = True
+                        self.movement[1][0] = True
                     if event.key == pygame.K_RIGHT:
-                        self.movement2[1] = True
+                        self.movement[1][1] = True
                     if event.key in (pygame.K_RCTRL, pygame.K_l):
-                        if self.player2.attack():
+                        if self.players[1].attack():
                             self.blits['p2_attack'].regenerate()
                             self.sfx['dash'].play()
                     if event.key == pygame.K_RSHIFT:
-                        if self.player2.dash():
+                        if self.players[1].dash():
                             self.blits['p2_dash'].regenerate()
                             self.sfx['dash'].play()
 
                 if event.type == pygame.KEYUP:
                     if event.key == pygame.K_a:
-                        self.movement1[0] = False
+                        self.movement[0][0] = False
                     if event.key == pygame.K_d:
-                        self.movement1[1] = False
+                        self.movement[0][1] = False
 
                     if event.key == pygame.K_LEFT:
-                        self.movement2[0] = False
+                        self.movement[1][0] = False
                     if event.key == pygame.K_RIGHT:
-                        self.movement2[1] = False
+                        self.movement[1][1] = False
+
+                for i, controller in enumerate(self.controllers):
+                    if event.type == pygame.JOYAXISMOTION:
+                        if event.joy == controller.get_id():
+                            axis = event.axis
+                            axis_value = event.value
+
+                            if axis == 0:
+                                if axis_value > 0.2:
+                                    self.movement[i][1] = True
+                                    self.movement[i][0] = False
+                                elif axis_value < -0.2:
+                                    self.movement[i][0] = True
+                                    self.movement[i][1] = False
+                                else:
+                                    self.movement[i][0] = False
+                                    self.movement[i][1] = False
+
+                    if event.type == pygame.JOYBUTTONDOWN:
+                        if event.joy == controller.get_id():
+                            if event.button == 7: # menu button
+                                self.pause()
+                            if event.button == 0:
+                                if self.players[i].jump():
+                                    self.sfx['jump'].play()
+                            elif event.button == 1:
+                                if self.players[i].attack():
+                                    self.blits['p2_attack'].regenerate()
+                                    self.sfx['dash'].play()
+                            elif event.button == 2:
+                                if self.players[i].dash():
+                                    self.blits['p2_dash'].regenerate()
+                                    self.sfx['dash'].play()
 
             self.screen.blit(pygame.transform.scale(self.display, self.screen.get_size()), (0,0))
             pygame.display.update()
