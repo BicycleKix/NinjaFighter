@@ -2,6 +2,7 @@ import sys
 import random
 import os
 import json
+import math
 
 import pygame
 
@@ -27,6 +28,7 @@ class Game:
         self.display = pygame.Surface((320, 240))
 
         self.clock = pygame.time.Clock()
+        self.open_game = False
 
         # joystick_count = pygame.joystick.get_count()
         self.controllers = []
@@ -52,7 +54,8 @@ class Game:
             'dash':pygame.mixer.Sound('data/sfx/dash.wav'),
             'hit':pygame.mixer.Sound('data/sfx/hit.wav'),
             'select':pygame.mixer.Sound('data/sfx/shoot.wav'),
-            'intro':pygame.mixer.Sound('data/sfx/intro_audio.wav')
+            'intro':pygame.mixer.Sound('data/sfx/intro_audio.wav'),
+            'lobby':pygame.mixer.Sound('data/sfx/lobby.wav'),
         }
 
         self.sfx['select'].set_volume(0.4)
@@ -70,6 +73,7 @@ class Game:
             'clouds': load_images('clouds'),
             'players': load_images('player_selection', alt=True),
             'attack': Animation(load_images('attack', alt=True), img_dur=3, loop=False),
+            'bomb': load_png('icons/bomb.png'),
         }
 
         self.blits = {
@@ -77,13 +81,17 @@ class Game:
             'p2_attack': Blit(self, (294, 10), cooldown=90),
             'p1_dash': Blit(self, (30, 10), cooldown=120),
             'p2_dash': Blit(self, (274, 10), cooldown=120),
+            'p1_bomb': Blit(self, (50, 10), cooldown=300),
+            'p2_bomb': Blit(self, (254, 10), cooldown=300),
         }
 
         self.rects = {
             'attack1': {'color': (170, 0, 0), 'pos': (9, 9)},
             'attack2': {'color': (170, 0, 0), 'pos': (293, 9)},
-            'dash1': {'color': (0, 100, 220), 'pos':(29, 9)},
-            'dash2': {'color': (0, 100, 220), 'pos':(273, 9)},
+            'dash1': {'color': (0, 100, 220), 'pos': (29, 9)},
+            'dash2': {'color': (0, 100, 220), 'pos': (273, 9)},
+            'bomb1': {'color': (150, 140, 110), 'pos': (49, 9)},
+            'bomb2': {'color': (150, 140, 110), 'pos': (253, 9)},
         }
 
         self.icons = {
@@ -91,6 +99,8 @@ class Game:
             'sword2': {'img': load_png('icons/sword.png'), 'pos': (295, 11)},
             'dash1': {'img': load_png('icons/dash.png'), 'pos': (31, 11)},
             'dash2': {'img': load_png('icons/dash.png'), 'pos': (275, 11)},
+            'bomb1': {'img': load_png('icons/bomb.png'), 'pos': (51, 11)},
+            'bomb2': {'img': load_png('icons/bomb.png'), 'pos': (255, 11)},
         }
 
         self.player_stats = {}
@@ -101,6 +111,11 @@ class Game:
         self.movement = [[False, False], [False, False]]
 
         self.tilemap = Tilemap(self)
+
+        self.bombs = []
+        self.smoke = []
+        self.bomb_effect = []
+        self.smoke_effect_radius = 25
 
     def load_stats_from_file(self, filename):
         try:
@@ -131,7 +146,10 @@ class Game:
 
         menu_options = [self.start, self.stats, self.options, self.quit]
 
-        self.sfx['intro'].play()
+        if not self.open_game:
+            self.sfx['intro'].play()
+            self.open_game = True
+            pygame.mixer.music.set_endevent(pygame.USEREVENT + 1)
         
         menu_rects = [
             [self.green, (110, 70), (100, 30)],
@@ -174,6 +192,9 @@ class Game:
                 if event.type == pygame.QUIT:
                     self.quit()
 
+                if event.type == pygame.USEREVENT + 1:
+                    self.sfx['lobby'].play(-1)
+
                 if event.type == pygame.JOYDEVICEADDED:
                     joystick = pygame.joystick.Joystick(event.device_index)
                     joystick.init()
@@ -182,6 +203,7 @@ class Game:
 
                 if event.type == pygame.JOYDEVICEREMOVED:
                     del self.controllers[event.instance_id]
+                    print("Joystick", event.device_index + 1, ":", joystick.get_name(), "removed")
 
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:
@@ -572,6 +594,7 @@ class Game:
     def game(self):
 
         run = True
+        self.sfx['lobby'].stop()
 
         while run:
             self.display.blit(self.assets['background'], (0,0))
@@ -620,7 +643,7 @@ class Game:
                                 self.sfx['hit'].play()
 
             if any(player.health <= 0 for player in self.players):
-                for players in self.player_stats:
+                for players in self.users:
                     self.player_stats[players]['gp'] += 1
                 if self.players[0].health <= 0:
                     self.player_stats[self.users[1]]['w'] += 1
@@ -629,6 +652,86 @@ class Game:
                     self.player_stats[self.users[1]]['l'] += 1
                     self.player_stats[self.users[0]]['w'] += 1
                 self.load_level('map')
+
+            for bomb in self.bombs:
+                bomb[1][1] += 0.1
+                bomb[0][0] += bomb[1][0]
+                bomb[0][1] += bomb[1][1]
+
+                entity_rect = pygame.Rect(bomb[0][0], bomb[0][1], self.assets['bomb'].get_width(), self.assets['bomb'].get_height())
+
+                if bomb[0][1] >= 240:
+                    self.bombs.remove(bomb)
+
+                for rect in self.tilemap.physics_rects_around(bomb[0]):
+                    if entity_rect.colliderect(rect) and bomb[0][1] < 240:
+                        self.bomb_effect.append([bomb[0], 0])
+                        for _ in range(30):
+                            centrepoint = (bomb[0][0] + self.smoke_effect_radius * random.uniform(-1, 1) * 0.75, bomb[0][1] + self.smoke_effect_radius * random.uniform(-1, 1) * 0.75)
+                            max_r = 15 * random.random()
+                            self.smoke.append([centrepoint, max_r, 0, 0]) # (/, /, current radius, time)
+                        self.bombs.remove(bomb)
+                        break
+
+                self.display.blit(self.assets['bomb'], bomb[0])
+
+            for bomb_effect in self.bomb_effect:
+                bomb_effect[1] += 1
+                if bomb_effect[1] >= 300:
+                    self.bomb_effect.remove(bomb_effect)
+
+            for smoke in self.smoke:
+                smoke[3] += 1
+                if smoke[3] < 300:
+                    smoke[2] = min(smoke[2] + 0.5, smoke[1])
+                else:
+                    smoke[2] = max(smoke[2] - 0.5, 0)
+                if smoke[2] == 0:
+                    self.smoke.remove(smoke)
+                pygame.draw.circle(self.display, (200, 200, 200), smoke[0], smoke[2])
+
+            for player in self.players:
+                hitbox = player.rect()
+                smoking = False
+                for bomb_effect in self.bomb_effect:
+                    if hitbox.top + self.player_size[1] >= bomb_effect[0][1] and hitbox.top <= bomb_effect[0][1]: #level in the y
+                        if hitbox.left >= bomb_effect[0][0]: #level and to the right
+                            if abs(hitbox.left - bomb_effect[0][0]) <= self.smoke_effect_radius:
+                                smoking = True
+                                break
+                        else: #level and to the left
+                            if abs(hitbox.left + self.player_size[0] - bomb_effect[0][0]) <= self.smoke_effect_radius:
+                                smoking = True
+                                break
+                    elif hitbox.left + self.player_size[0] >= bomb_effect[0][0] and hitbox.left <= bomb_effect[0][0]: #level in the x
+                        if hitbox.top >= bomb_effect[0][1]: #level and below
+                            if abs(hitbox.top - bomb_effect[0][1]) <= self.smoke_effect_radius:
+                                smoking = True
+                                break
+                        else: #level and above
+                            if abs(hitbox.top + self.player_size[1] - bomb_effect[0][1]) <= self.smoke_effect_radius:
+                                smoking = True
+                                break
+                    elif hitbox.left > bomb_effect[0][0]: #to the right
+                        if hitbox.top > bomb_effect[0][1]: #below
+                            if math.hypot(abs(hitbox.left-bomb_effect[0][0]), abs(hitbox.top-bomb_effect[0][1])) <= self.smoke_effect_radius:
+                                smoking = True
+                                break
+                        else: #above
+                            if math.hypot(abs(hitbox.left-bomb_effect[0][0]), abs(hitbox.top + self.player_size[1]-bomb_effect[0][1])) <= self.smoke_effect_radius:
+                                smoking = True
+                                break
+                    else: #to the left
+                        if hitbox.top > bomb_effect[0][1]: #below
+                            if math.hypot(abs(hitbox.left + self.player_size[0]-bomb_effect[0][0]), abs(hitbox.top-bomb_effect[0][1])) <= self.smoke_effect_radius:
+                                smoking = True
+                                break
+                        else: #above
+                            if math.hypot(abs(hitbox.left + self.player_size[0]-bomb_effect[0][0]), abs(hitbox.top + self.player_size[1]-bomb_effect[0][1])) <= self.smoke_effect_radius:
+                                smoking = True
+                                break
+                if smoking:
+                    player.health -= 0.5
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -653,6 +756,9 @@ class Game:
                         if self.players[0].dash():
                             self.blits['p1_dash'].regenerate()
                             self.sfx['dash'].play()
+                    if event.key == pygame.K_q:
+                        if self.players[0].bomb():
+                                    self.blits['p1_bomb'].regenerate()
 
                     if event.key == pygame.K_UP:
                         if self.players[1].jump():
@@ -687,7 +793,10 @@ class Game:
                             axis = event.axis
                             axis_value = event.value
 
+                            #print(f"Controller {controller.get_id()} axis {axis} moved to {axis_value}")
+
                             if axis == 0:
+                                #print(f"Controller {controller.get_id()} movement")
                                 if axis_value > 0.2:
                                     self.movement[i][1] = True
                                     self.movement[i][0] = False
@@ -698,6 +807,8 @@ class Game:
                                     self.movement[i][0] = False
                                     self.movement[i][1] = False
 
+                            #print(f"Movement for controller {controller.get_id()}: {self.movement[i]}")
+
                     if event.type == pygame.JOYBUTTONDOWN:
                         if event.joy == controller.get_id():
                             if event.button == 7: # menu button
@@ -705,14 +816,17 @@ class Game:
                             if event.button == 0:
                                 if self.players[i].jump():
                                     self.sfx['jump'].play()
-                            elif event.button == 1:
+                            if event.button == 1:
                                 if self.players[i].attack():
-                                    self.blits['p2_attack'].regenerate()
+                                    self.blits['p' + str(controller.get_id() + 1) + '_attack'].regenerate()
                                     self.sfx['dash'].play()
-                            elif event.button == 2:
+                            if event.button == 2:
                                 if self.players[i].dash():
-                                    self.blits['p2_dash'].regenerate()
+                                    self.blits['p' + str(controller.get_id() + 1) + '_dash'].regenerate()
                                     self.sfx['dash'].play()
+                            if event.button == 3:
+                                if self.players[i].bomb():
+                                    self.blits['p' + str(controller.get_id() + 1) + '_bomb'].regenerate()
 
             self.screen.blit(pygame.transform.scale(self.display, self.screen.get_size()), (0,0))
             pygame.display.update()

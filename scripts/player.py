@@ -28,6 +28,8 @@ class Player:
         self.hitting = False
         self.health = 100.
 
+        self.bombing = 0
+
     def rect(self, alt=False):
         if alt:
             if self.flip:
@@ -123,6 +125,8 @@ class Player:
         else:
             self.velocity[0] = min(self.velocity[0] + 0.1, 0)
 
+        self.bombing = max(0, self.bombing - 1)
+
     def render(self, surf):
         surf.blit(pygame.transform.flip(self.animation.img(), self.flip, False), (self.pos[0] + self.anim_offset[0], self.pos[1] + self.anim_offset[1]))
 
@@ -155,4 +159,19 @@ class Player:
             self.attacking = 90
             self.attack_animation = self.game.assets['attack'].copy()
             self.hitting = False
+            return True
+        
+    def bomb(self):
+        if self.attacking <= 51 and not self.bombing:
+            self.bombing = 300
+            if self.air_time < 5:
+                if self.flip:
+                    vel = (-3, -1)
+                else:
+                    vel = (3, -1)
+            else:
+                vel = (0, 0)
+
+            bomb_position = self.pos[:]
+            self.game.bombs.append([bomb_position, list(vel)])
             return True
